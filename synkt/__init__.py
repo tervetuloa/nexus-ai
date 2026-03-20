@@ -1,6 +1,6 @@
 """synkt - Testing framework for multi-agent LLM systems."""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 from synkt.assertions.coordination import assert_handoff, assert_parallel_execution
 from synkt.assertions.system import assert_cost_under, assert_no_loop
