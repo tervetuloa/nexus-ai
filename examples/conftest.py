@@ -1,2 +1,2 @@
-﻿pytest_plugins = ["nexus_ai.pytest_plugin"]
+pytest_plugins = ["synkt.pytest_plugin"]
 

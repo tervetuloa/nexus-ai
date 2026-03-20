@@ -1,10 +1,10 @@
-﻿# nexus-ai
+# synkt
 
 A small testing framework for multi-agent systems.
 
 ```python
-from nexus_ai import assert_handoff, assert_no_loop
-from nexus_ai.interceptors.langgraph import LangGraphInterceptor
+from synkt import assert_handoff, assert_no_loop
+from synkt.interceptors.langgraph import LangGraphInterceptor
 
 from examples.customer_service.system import build_customer_service_graph
 
@@ -20,7 +20,7 @@ def test_refund_flow():
     assert "12345" in result["resolution"]
 ```
 
-## Why nexus-ai?
+## Why synkt?
 
 Most eval tools check final output quality. That is useful, but multi-agent bugs usually happen in the middle:
 
@@ -29,12 +29,12 @@ Most eval tools check final output quality. That is useful, but multi-agent bugs
 - A flow starts looping and burns tokens
 - Parallel steps stop being parallel after a refactor
 
-`nexus-ai` is for testing those coordination paths directly.
+`synkt` is for testing those coordination paths directly.
 
 ## Installation
 
 ```bash
-pip install nexus-ai
+pip install synkt
 ```
 
 For local development in this repo:
@@ -52,8 +52,8 @@ pip install -e ".[dev,langgraph]"
 4. Assert on handoffs, loops, tools, and cost.
 
 ```python
-from nexus_ai import assert_handoff, assert_no_loop
-from nexus_ai.interceptors.langgraph import LangGraphInterceptor
+from synkt import assert_handoff, assert_no_loop
+from synkt.interceptors.langgraph import LangGraphInterceptor
 
 
 def test_my_flow():

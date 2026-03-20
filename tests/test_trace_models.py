@@ -1,6 +1,6 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
-from nexus_ai.trace.models import AgentTrace
+from synkt.trace.models import AgentTrace
 
 
 def test_add_message_records_message() -> None:

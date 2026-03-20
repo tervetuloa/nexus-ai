@@ -1,13 +1,13 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import pytest
 from pydantic import BaseModel
 
-from nexus_ai.assertions.coordination import assert_handoff, assert_parallel_execution
-from nexus_ai.assertions.system import assert_cost_under, assert_no_loop
-from nexus_ai.assertions.tools import assert_no_tool_called, assert_tool_called
-from nexus_ai.trace.models import AgentTrace
-from nexus_ai.trace.storage import set_current_trace
+from synkt.assertions.coordination import assert_handoff, assert_parallel_execution
+from synkt.assertions.system import assert_cost_under, assert_no_loop
+from synkt.assertions.tools import assert_no_tool_called, assert_tool_called
+from synkt.trace.models import AgentTrace
+from synkt.trace.storage import set_current_trace
 
 
 class RefundRequest(BaseModel):

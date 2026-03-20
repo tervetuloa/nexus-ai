@@ -1,9 +1,9 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from typing import Any
 
-from nexus_ai.interceptors.langgraph import LangGraphInterceptor
-from nexus_ai.trace.storage import get_current_trace
+from synkt.interceptors.langgraph import LangGraphInterceptor
+from synkt.trace.storage import get_current_trace
 
 
 class FakeCompiledGraph:

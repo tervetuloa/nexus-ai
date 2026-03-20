@@ -1,10 +1,10 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import pytest
 
-from nexus_ai import assert_handoff, assert_no_loop, assert_parallel_execution
-from nexus_ai.interceptors.langgraph import LangGraphInterceptor
-from nexus_ai.trace.storage import get_current_trace
+from synkt import assert_handoff, assert_no_loop, assert_parallel_execution
+from synkt.interceptors.langgraph import LangGraphInterceptor
+from synkt.trace.storage import get_current_trace
 
 from .system import build_research_crew_graph, default_research_input
 

@@ -1,2 +1,2 @@
-﻿"""Customer service example system for nexus_ai."""
+"""Customer service example system for synkt."""
 

@@ -1,9 +1,9 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import pytest
 
-from nexus_ai import assert_handoff, assert_no_loop
-from nexus_ai.interceptors.langgraph import LangGraphInterceptor
+from synkt import assert_handoff, assert_no_loop
+from synkt.interceptors.langgraph import LangGraphInterceptor
 
 from .system import build_customer_service_graph
 

@@ -1,8 +1,8 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
-from nexus_ai.trace.models import AgentTrace
-from nexus_ai.trace.pretty import format_trace, print_trace
-from nexus_ai.trace.storage import set_current_trace
+from synkt.trace.models import AgentTrace
+from synkt.trace.pretty import format_trace, print_trace
+from synkt.trace.storage import set_current_trace
 
 
 def test_format_trace_includes_messages_and_summary() -> None:
