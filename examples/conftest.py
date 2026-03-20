@@ -1,1 +1,2 @@
-pytest_plugins = ["agenttest.pytest_plugin"]
+﻿pytest_plugins = ["nexus_ai.pytest_plugin"]
+

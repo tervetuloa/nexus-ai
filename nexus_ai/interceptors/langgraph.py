@@ -1,10 +1,10 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from collections.abc import Callable
 from typing import Any
 
-from agenttest.interceptors.base import BaseInterceptor
-from agenttest.trace.storage import get_current_trace
+from nexus_ai.interceptors.base import BaseInterceptor
+from nexus_ai.trace.storage import get_current_trace
 
 
 class LangGraphInterceptor(BaseInterceptor):
@@ -67,3 +67,4 @@ class LangGraphInterceptor(BaseInterceptor):
         """Invoke the graph (same API as StateGraph.invoke)."""
         self._previous_node_name = "start"
         return self.graph.compile().invoke(*args, **kwargs)
+

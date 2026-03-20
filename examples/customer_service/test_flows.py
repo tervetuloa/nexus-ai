@@ -1,9 +1,9 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import pytest
 
-from agenttest import assert_handoff, assert_no_loop
-from agenttest.interceptors.langgraph import LangGraphInterceptor
+from nexus_ai import assert_handoff, assert_no_loop
+from nexus_ai.interceptors.langgraph import LangGraphInterceptor
 
 from .system import build_customer_service_graph
 
@@ -36,3 +36,4 @@ def test_no_infinite_loops() -> None:
 
     test_graph.invoke({"input": "help me"})
     assert_no_loop(max_iterations=3)
+

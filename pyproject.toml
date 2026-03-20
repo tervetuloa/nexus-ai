@@ -1,9 +1,9 @@
-[build-system]
+﻿[build-system]
 requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "agenttest"
+name = "nexus-ai"
 version = "0.1.0"
 description = "Testing framework for multi-agent LLM systems"
 readme = "docs/DESIGN.md"
@@ -25,3 +25,4 @@ langgraph = [
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests", "examples"]
+

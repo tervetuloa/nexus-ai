@@ -1,5 +1,6 @@
-"""Framework interceptors for trace collection."""
+﻿"""Framework interceptors for trace collection."""
 
-from agenttest.interceptors.langgraph import LangGraphInterceptor
+from nexus_ai.interceptors.langgraph import LangGraphInterceptor
 
 __all__ = ["LangGraphInterceptor"]
+

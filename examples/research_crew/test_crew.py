@@ -1,10 +1,10 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import pytest
 
-from agenttest import assert_handoff, assert_no_loop, assert_parallel_execution
-from agenttest.interceptors.langgraph import LangGraphInterceptor
-from agenttest.trace.storage import get_current_trace
+from nexus_ai import assert_handoff, assert_no_loop, assert_parallel_execution
+from nexus_ai.interceptors.langgraph import LangGraphInterceptor
+from nexus_ai.trace.storage import get_current_trace
 
 from .system import build_research_crew_graph, default_research_input
 
@@ -107,3 +107,4 @@ def test_recovery_retries_after_transient_failure() -> None:
     assert result["recovery_attempts"] == 2
     assert result["recovered"] is True
     assert result["approved"] is True
+

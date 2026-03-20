@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
-from agenttest.trace.models import AgentTrace
+from nexus_ai.trace.models import AgentTrace
 
 
 def test_add_message_records_message() -> None:
@@ -32,3 +32,4 @@ def test_add_tool_call_records_call() -> None:
     assert call.args["order_id"] == "123"
     assert call.result == {"ok": True}
     assert call.duration_ms == 12.5
+

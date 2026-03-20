@@ -1,9 +1,9 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from typing import Any
 
-from agenttest.interceptors.langgraph import LangGraphInterceptor
-from agenttest.trace.storage import get_current_trace
+from nexus_ai.interceptors.langgraph import LangGraphInterceptor
+from nexus_ai.trace.storage import get_current_trace
 
 
 class FakeCompiledGraph:
@@ -49,3 +49,4 @@ def test_langgraph_interceptor_records_transitions() -> None:
     assert trace.messages[0].to_agent == "triage"
     assert trace.messages[1].from_agent == "triage"
     assert trace.messages[1].to_agent == "refunds"
+

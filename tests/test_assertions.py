@@ -1,13 +1,13 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import pytest
 from pydantic import BaseModel
 
-from agenttest.assertions.coordination import assert_handoff, assert_parallel_execution
-from agenttest.assertions.system import assert_cost_under, assert_no_loop
-from agenttest.assertions.tools import assert_no_tool_called, assert_tool_called
-from agenttest.trace.models import AgentTrace
-from agenttest.trace.storage import set_current_trace
+from nexus_ai.assertions.coordination import assert_handoff, assert_parallel_execution
+from nexus_ai.assertions.system import assert_cost_under, assert_no_loop
+from nexus_ai.assertions.tools import assert_no_tool_called, assert_tool_called
+from nexus_ai.trace.models import AgentTrace
+from nexus_ai.trace.storage import set_current_trace
 
 
 class RefundRequest(BaseModel):
@@ -120,3 +120,4 @@ def test_assert_parallel_execution_success() -> None:
     set_current_trace(trace)
 
     assert_parallel_execution(["agent_a", "agent_b"], max_time_delta_ms=1000)
+

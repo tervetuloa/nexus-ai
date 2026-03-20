@@ -1,8 +1,8 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from typing import Any, Optional
 
-from agenttest.trace.storage import get_current_trace
+from nexus_ai.trace.storage import get_current_trace
 
 
 def assert_tool_called(
@@ -52,3 +52,4 @@ def assert_no_tool_called(tool_name: str, by_agent: Optional[str] = None) -> Non
         raise AssertionError(
             f"Expected no calls to '{tool_name}', but found {len(calls)} calls"
         )
+

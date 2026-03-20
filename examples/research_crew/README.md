@@ -1,4 +1,4 @@
-# Research Crew Example
+﻿# Research Crew Example
 
 Concrete multi-agent research example with a branch + fan-out stage.
 
@@ -23,7 +23,7 @@ python -m pytest examples/research_crew/test_crew.py -vv
 Print the timeline while tests run:
 
 ```python
-from agenttest import print_trace
+from nexus_ai import print_trace
 
 # ... after tested.invoke(...)
 print_trace(include_content=True)
@@ -34,3 +34,4 @@ Then run with:
 ```bash
 python -m pytest examples/research_crew/test_crew.py -s -vv
 ```
+

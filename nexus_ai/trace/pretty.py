@@ -1,9 +1,9 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from typing import Any
 
-from agenttest.trace.models import AgentTrace
-from agenttest.trace.storage import get_current_trace
+from nexus_ai.trace.models import AgentTrace
+from nexus_ai.trace.storage import get_current_trace
 
 
 def _shorten(value: Any, max_len: int = 120) -> str:
@@ -84,3 +84,4 @@ def print_trace(
             include_summary=include_summary,
         )
     )
+

@@ -1,9 +1,9 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from contextvars import ContextVar
 from typing import Optional
 
-from agenttest.trace.models import AgentTrace
+from nexus_ai.trace.models import AgentTrace
 
 
 _current_trace: ContextVar[Optional[AgentTrace]] = ContextVar("_current_trace", default=None)
@@ -25,3 +25,4 @@ def set_current_trace(trace: AgentTrace) -> None:
 def clear_current_trace() -> None:
     """Clear the trace (called after test)."""
     _current_trace.set(None)
+

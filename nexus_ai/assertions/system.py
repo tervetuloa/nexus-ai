@@ -1,8 +1,8 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from collections import Counter
 
-from agenttest.trace.storage import get_current_trace
+from nexus_ai.trace.storage import get_current_trace
 
 
 def assert_no_loop(max_iterations: int = 10) -> None:
@@ -40,3 +40,4 @@ def assert_cost_under(threshold: float) -> None:
         raise AssertionError(
             f"Test cost ${trace.total_cost:.2f} exceeds threshold ${threshold:.2f}"
         )
+

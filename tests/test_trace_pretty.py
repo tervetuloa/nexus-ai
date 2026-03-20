@@ -1,8 +1,8 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
-from agenttest.trace.models import AgentTrace
-from agenttest.trace.pretty import format_trace, print_trace
-from agenttest.trace.storage import set_current_trace
+from nexus_ai.trace.models import AgentTrace
+from nexus_ai.trace.pretty import format_trace, print_trace
+from nexus_ai.trace.storage import set_current_trace
 
 
 def test_format_trace_includes_messages_and_summary() -> None:
@@ -44,3 +44,4 @@ def test_print_trace_writes_timeline(capsys) -> None:
 
     captured = capsys.readouterr()
     assert "a -> b" in captured.out
+

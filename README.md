@@ -1,10 +1,10 @@
-# agenttest
+﻿# nexus-ai
 
 A small testing framework for multi-agent systems.
 
 ```python
-from agenttest import assert_handoff, assert_no_loop
-from agenttest.interceptors.langgraph import LangGraphInterceptor
+from nexus_ai import assert_handoff, assert_no_loop
+from nexus_ai.interceptors.langgraph import LangGraphInterceptor
 
 from examples.customer_service.system import build_customer_service_graph
 
@@ -20,7 +20,7 @@ def test_refund_flow():
     assert "12345" in result["resolution"]
 ```
 
-## Why agenttest?
+## Why nexus-ai?
 
 Most eval tools check final output quality. That is useful, but multi-agent bugs usually happen in the middle:
 
@@ -29,12 +29,12 @@ Most eval tools check final output quality. That is useful, but multi-agent bugs
 - A flow starts looping and burns tokens
 - Parallel steps stop being parallel after a refactor
 
-`agenttest` is for testing those coordination paths directly.
+`nexus-ai` is for testing those coordination paths directly.
 
 ## Installation
 
 ```bash
-pip install agenttest
+pip install nexus-ai
 ```
 
 For local development in this repo:
@@ -52,8 +52,8 @@ pip install -e ".[dev,langgraph]"
 4. Assert on handoffs, loops, tools, and cost.
 
 ```python
-from agenttest import assert_handoff, assert_no_loop
-from agenttest.interceptors.langgraph import LangGraphInterceptor
+from nexus_ai import assert_handoff, assert_no_loop
+from nexus_ai.interceptors.langgraph import LangGraphInterceptor
 
 
 def test_my_flow():
@@ -101,3 +101,4 @@ pytest -q
 ## License
 
 MIT
+

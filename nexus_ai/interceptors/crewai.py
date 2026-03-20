@@ -1,8 +1,8 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from typing import Any
 
-from agenttest.interceptors.base import BaseInterceptor
+from nexus_ai.interceptors.base import BaseInterceptor
 
 
 class CrewAIInterceptor(BaseInterceptor):
@@ -13,3 +13,4 @@ class CrewAIInterceptor(BaseInterceptor):
 
     def invoke(self, *args: Any, **kwargs: Any) -> Any:
         raise NotImplementedError("CrewAIInterceptor is not implemented in this MVP")
+
