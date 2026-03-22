@@ -59,37 +59,19 @@ export const AnimatedEdge = memo(function AnimatedEdge({
   const dy = targetY - sourceY
   const distance = Math.sqrt(dx * dx + dy * dy)
 
-  // Scale curvature proportionally — avoid oversized curves for short edges
-  const curvature = Math.min(distance * 0.3, Math.max(20, distance * 0.25))
+  // Gentle curvature using a perpendicular offset at control points.
+  // This avoids the flip that happens when switching between horizontal/vertical branching.
+  const curvature = Math.min(40, distance * 0.15)
 
-  // Determine curve direction based on relative positions
-  // For mostly horizontal edges, curve vertically; for vertical, curve horizontally
-  const absDx = Math.abs(dx)
-  const absDy = Math.abs(dy)
+  // Perpendicular unit vector (always curves to the same side — "left" of the direction)
+  const nx = distance > 0 ? -dy / distance : 0
+  const ny = distance > 0 ? dx / distance : 0
 
-  let controlX1: number, controlY1: number, controlX2: number, controlY2: number
-
-  if (distance < 30) {
-    // Very short edges: straight line
-    controlX1 = sourceX + dx * 0.33
-    controlY1 = sourceY + dy * 0.33
-    controlX2 = sourceX + dx * 0.66
-    controlY2 = sourceY + dy * 0.66
-  } else if (absDy > absDx) {
-    // More vertical: curve outward horizontally
-    const sign = dx >= 0 ? 1 : -1
-    controlX1 = sourceX + sign * curvature
-    controlY1 = sourceY + dy * 0.33
-    controlX2 = targetX + sign * curvature
-    controlY2 = targetY - dy * 0.33
-  } else {
-    // More horizontal: curve outward vertically
-    const sign = dy >= 0 ? 1 : -1
-    controlX1 = sourceX + dx * 0.33
-    controlY1 = sourceY + sign * curvature
-    controlX2 = targetX - dx * 0.33
-    controlY2 = targetY + sign * curvature
-  }
+  // Control points: 1/3 and 2/3 along the line, offset perpendicularly
+  const controlX1 = sourceX + dx * 0.33 + nx * curvature
+  const controlY1 = sourceY + dy * 0.33 + ny * curvature
+  const controlX2 = sourceX + dx * 0.66 + nx * curvature
+  const controlY2 = sourceY + dy * 0.66 + ny * curvature
 
   const pathD = `M ${sourceX} ${sourceY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${targetX} ${targetY}`
 
