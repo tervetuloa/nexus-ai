@@ -30,3 +30,4 @@ build/
 # OS files
 .DS_Store
 Thumbs.db
+synkt-ui/tsconfig.tsbuildinfo
