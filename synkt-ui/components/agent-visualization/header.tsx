@@ -1,7 +1,7 @@
 "use client"
 
 import { memo } from "react"
-import { Activity, Settings, RefreshCw, Layout } from "lucide-react"
+import { Activity, Settings, RefreshCw, Layout, Download, Search } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { GlassButton } from "./glass-button"
 
@@ -10,6 +10,7 @@ export interface HeaderProps {
   onRefresh?: () => void
   onSettings?: () => void
   onLayoutToggle?: () => void
+  onExport?: () => void
   isConnected?: boolean
   className?: string
 }
@@ -19,6 +20,7 @@ export const Header = memo(function Header({
   onRefresh,
   onSettings,
   onLayoutToggle,
+  onExport,
   isConnected = true,
   className,
 }: HeaderProps) {
@@ -53,19 +55,30 @@ export const Header = memo(function Header({
 
       {/* Right: Controls */}
       <div className="flex items-center gap-2">
-        <GlassButton size="sm" onClick={onLayoutToggle}>
-          <Layout className="h-4 w-4" />
-          <span className="hidden sm:inline">Layout</span>
-        </GlassButton>
+        {onLayoutToggle && (
+          <GlassButton size="sm" onClick={onLayoutToggle}>
+            <Layout className="h-4 w-4" />
+            <span className="hidden sm:inline">Layout</span>
+          </GlassButton>
+        )}
+
+        {onExport && (
+          <GlassButton size="sm" onClick={onExport}>
+            <Download className="h-4 w-4" />
+            <span className="hidden sm:inline">Export</span>
+          </GlassButton>
+        )}
 
         <GlassButton size="sm" onClick={onRefresh}>
           <RefreshCw className="h-4 w-4" />
           <span className="hidden sm:inline">Refresh</span>
         </GlassButton>
 
-        <GlassButton size="sm" onClick={onSettings}>
-          <Settings className="h-4 w-4" />
-        </GlassButton>
+        {onSettings && (
+          <GlassButton size="sm" onClick={onSettings}>
+            <Settings className="h-4 w-4" />
+          </GlassButton>
+        )}
       </div>
     </header>
   )

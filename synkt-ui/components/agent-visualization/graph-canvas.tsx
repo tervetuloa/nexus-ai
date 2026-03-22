@@ -2,10 +2,13 @@
 
 import { memo, useState, useCallback, useRef, useEffect } from "react"
 import { cn } from "@/lib/utils"
-import { RotateCcw, Grid3X3, Maximize2 } from "lucide-react"
+import { RotateCcw, Grid3X3, Maximize2, Search, X } from "lucide-react"
 import { AgentNode, type AgentNodeProps } from "./agent-node"
 import { AnimatedEdge, type EdgeStatus } from "./animated-edge"
 import { GlassButton } from "./glass-button"
+
+const NODE_WIDTH = 280
+const NODE_HEIGHT = 100 // Approximate rendered height
 
 export interface GraphNode extends AgentNodeProps {
   x: number
@@ -17,6 +20,7 @@ export interface GraphEdge {
   source: string
   target: string
   status: EdgeStatus
+  label?: string
 }
 
 export interface GraphCanvasProps {
@@ -26,6 +30,35 @@ export interface GraphCanvasProps {
   onNodeSelect: (nodeId: string) => void
   onNodesChange?: (nodes: GraphNode[]) => void
   className?: string
+}
+
+/**
+ * Calculate the point on the border of a rectangle closest to a target point.
+ * This ensures edges connect from the edge of nodes, not the center.
+ */
+function getBorderPoint(
+  nodeX: number, nodeY: number,
+  targetX: number, targetY: number,
+): { x: number; y: number } {
+  const cx = nodeX + NODE_WIDTH / 2
+  const cy = nodeY + NODE_HEIGHT / 2
+  const dx = targetX - cx
+  const dy = targetY - cy
+
+  if (dx === 0 && dy === 0) return { x: cx, y: cy }
+
+  const halfW = NODE_WIDTH / 2
+  const halfH = NODE_HEIGHT / 2
+
+  // Check intersection with each edge of the rectangle
+  const scaleX = dx !== 0 ? halfW / Math.abs(dx) : Infinity
+  const scaleY = dy !== 0 ? halfH / Math.abs(dy) : Infinity
+  const scale = Math.min(scaleX, scaleY)
+
+  return {
+    x: cx + dx * scale,
+    y: cy + dy * scale,
+  }
 }
 
 export const GraphCanvas = memo(function GraphCanvas({
@@ -44,22 +77,54 @@ export const GraphCanvas = memo(function GraphCanvas({
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null)
   const [nodeDragStart, setNodeDragStart] = useState({ x: 0, y: 0 })
   const [initialNodePos, setInitialNodePos] = useState({ x: 0, y: 0 })
+  const [searchQuery, setSearchQuery] = useState("")
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
-  // Get node position for edge calculation
-  const getNodePosition = useCallback((nodeId: string) => {
-    const node = nodes.find((n) => n.id === nodeId)
-    if (!node) return { x: 0, y: 0 }
-    return {
-      x: node.x + 140, // Half of node width
-      y: node.y + 40, // Approximate center height
-    }
-  }, [nodes])
+  // Filtered nodes based on search
+  const matchingNodeIds = searchQuery
+    ? new Set(
+        nodes
+          .filter((n) =>
+            n.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            n.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            n.type.toLowerCase().includes(searchQuery.toLowerCase())
+          )
+          .map((n) => n.id)
+      )
+    : null
+
+  // Get edge connection points using border intersection
+  const getEdgePoints = useCallback(
+    (sourceId: string, targetId: string) => {
+      const sourceNode = nodes.find((n) => n.id === sourceId)
+      const targetNode = nodes.find((n) => n.id === targetId)
+      if (!sourceNode || !targetNode) {
+        return { sourceX: 0, sourceY: 0, targetX: 0, targetY: 0 }
+      }
+
+      const sourceCx = sourceNode.x + NODE_WIDTH / 2
+      const sourceCy = sourceNode.y + NODE_HEIGHT / 2
+      const targetCx = targetNode.x + NODE_WIDTH / 2
+      const targetCy = targetNode.y + NODE_HEIGHT / 2
+
+      const sourcePoint = getBorderPoint(sourceNode.x, sourceNode.y, targetCx, targetCy)
+      const targetPoint = getBorderPoint(targetNode.x, targetNode.y, sourceCx, sourceCy)
+
+      return {
+        sourceX: sourcePoint.x,
+        sourceY: sourcePoint.y,
+        targetX: targetPoint.x,
+        targetY: targetPoint.y,
+      }
+    },
+    [nodes]
+  )
 
   // Handle canvas panning
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     const target = e.target as HTMLElement
     if (target.closest('[data-node-handle]')) {
-      // Start node drag
       const nodeElement = target.closest('[data-node]')
       if (nodeElement) {
         const nodeId = nodeElement.getAttribute('data-node-id')
@@ -75,8 +140,9 @@ export const GraphCanvas = memo(function GraphCanvas({
       }
       return
     }
-    
+
     if (target.closest('[data-node]')) return
+    if (target.closest('[data-search]')) return
     setIsDragging(true)
     setDragStart({ x: e.clientX - offset.x, y: e.clientY - offset.y })
   }, [offset, nodes])
@@ -85,15 +151,15 @@ export const GraphCanvas = memo(function GraphCanvas({
     if (draggingNodeId && onNodesChange) {
       const deltaX = (e.clientX - nodeDragStart.x) / scale
       const deltaY = (e.clientY - nodeDragStart.y) / scale
-      const updatedNodes = nodes.map(n => 
-        n.id === draggingNodeId 
+      const updatedNodes = nodes.map(n =>
+        n.id === draggingNodeId
           ? { ...n, x: initialNodePos.x + deltaX, y: initialNodePos.y + deltaY }
           : n
       )
       onNodesChange(updatedNodes)
       return
     }
-    
+
     if (!isDragging) return
     setOffset({
       x: e.clientX - dragStart.x,
@@ -110,7 +176,7 @@ export const GraphCanvas = memo(function GraphCanvas({
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault()
     const delta = e.deltaY > 0 ? 0.9 : 1.1
-    setScale((prev) => Math.max(0.5, Math.min(2, prev * delta)))
+    setScale((prev) => Math.max(0.3, Math.min(3, prev * delta)))
   }, [])
 
   // Center graph on mount
@@ -120,10 +186,33 @@ export const GraphCanvas = memo(function GraphCanvas({
       const avgX = nodes.reduce((sum, n) => sum + n.x, 0) / nodes.length
       const avgY = nodes.reduce((sum, n) => sum + n.y, 0) / nodes.length
       setOffset({
-        x: rect.width / 2 - avgX - 140,
-        y: rect.height / 2 - avgY - 40,
+        x: rect.width / 2 - avgX - NODE_WIDTH / 2,
+        y: rect.height / 2 - avgY - NODE_HEIGHT / 2,
       })
     }
+  }, [])
+
+  // Focus search input when opened
+  useEffect(() => {
+    if (isSearchOpen && searchInputRef.current) {
+      searchInputRef.current.focus()
+    }
+  }, [isSearchOpen])
+
+  // Keyboard shortcut: Ctrl/Cmd+F to open search
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "f") {
+        e.preventDefault()
+        setIsSearchOpen(true)
+      }
+      if (e.key === "Escape") {
+        setIsSearchOpen(false)
+        setSearchQuery("")
+      }
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
   }, [])
 
   // Layout functions
@@ -133,8 +222,8 @@ export const GraphCanvas = memo(function GraphCanvas({
       const avgX = nodes.reduce((sum, n) => sum + n.x, 0) / nodes.length
       const avgY = nodes.reduce((sum, n) => sum + n.y, 0) / nodes.length
       setOffset({
-        x: rect.width / 2 - avgX - 140,
-        y: rect.height / 2 - avgY - 40,
+        x: rect.width / 2 - avgX - NODE_WIDTH / 2,
+        y: rect.height / 2 - avgY - NODE_HEIGHT / 2,
       })
       setScale(1)
     }
@@ -143,7 +232,7 @@ export const GraphCanvas = memo(function GraphCanvas({
   const arrangeGrid = useCallback(() => {
     if (!onNodesChange) return
     const cols = Math.ceil(Math.sqrt(nodes.length))
-    const spacing = { x: 320, y: 180 }
+    const spacing = { x: 340, y: 160 }
     const updatedNodes = nodes.map((node, i) => ({
       ...node,
       x: (i % cols) * spacing.x,
@@ -157,10 +246,10 @@ export const GraphCanvas = memo(function GraphCanvas({
     if (!canvasRef.current || nodes.length === 0) return
     const rect = canvasRef.current.getBoundingClientRect()
     const minX = Math.min(...nodes.map(n => n.x))
-    const maxX = Math.max(...nodes.map(n => n.x + 280))
+    const maxX = Math.max(...nodes.map(n => n.x + NODE_WIDTH))
     const minY = Math.min(...nodes.map(n => n.y))
-    const maxY = Math.max(...nodes.map(n => n.y + 80))
-    
+    const maxY = Math.max(...nodes.map(n => n.y + NODE_HEIGHT))
+
     const contentWidth = maxX - minX + 100
     const contentHeight = maxY - minY + 100
     const newScale = Math.min(
@@ -168,13 +257,29 @@ export const GraphCanvas = memo(function GraphCanvas({
       rect.height / contentHeight,
       1.5
     )
-    
-    setScale(Math.max(0.5, newScale))
+
+    setScale(Math.max(0.3, newScale))
     setOffset({
       x: (rect.width - contentWidth * newScale) / 2 - minX * newScale,
       y: (rect.height - contentHeight * newScale) / 2 - minY * newScale,
     })
   }, [nodes])
+
+  // Minimap calculations
+  const minimapSize = { w: 160, h: 100 }
+  const allX = nodes.map(n => n.x)
+  const allY = nodes.map(n => n.y)
+  const graphBounds = nodes.length > 0
+    ? {
+        minX: Math.min(...allX) - 50,
+        maxX: Math.max(...allX) + NODE_WIDTH + 50,
+        minY: Math.min(...allY) - 50,
+        maxY: Math.max(...allY) + NODE_HEIGHT + 50,
+      }
+    : { minX: 0, maxX: 800, minY: 0, maxY: 600 }
+  const graphW = graphBounds.maxX - graphBounds.minX
+  const graphH = graphBounds.maxY - graphBounds.minY
+  const minimapScale = Math.min(minimapSize.w / graphW, minimapSize.h / graphH)
 
   return (
     <div
@@ -204,7 +309,7 @@ export const GraphCanvas = memo(function GraphCanvas({
         }}
       />
 
-      {/* Graph content layer - both edges and nodes share the same transform */}
+      {/* Graph content layer */}
       <div
         className="absolute"
         style={{
@@ -212,59 +317,142 @@ export const GraphCanvas = memo(function GraphCanvas({
           transformOrigin: "0 0",
         }}
       >
-        {/* Edges SVG - positioned at 0,0 within the transformed container */}
+        {/* Edges SVG */}
         <svg
           className="absolute pointer-events-none overflow-visible"
-          style={{
-            left: 0,
-            top: 0,
-            width: 1,
-            height: 1,
-            overflow: "visible",
-          }}
+          style={{ left: 0, top: 0, width: 1, height: 1, overflow: "visible" }}
         >
           {edges.map((edge) => {
-            const sourcePos = getNodePosition(edge.source)
-            const targetPos = getNodePosition(edge.target)
+            const pts = getEdgePoints(edge.source, edge.target)
             return (
               <AnimatedEdge
                 key={edge.id}
                 id={edge.id}
-                sourceX={sourcePos.x}
-                sourceY={sourcePos.y}
-                targetX={targetPos.x}
-                targetY={targetPos.y}
+                sourceX={pts.sourceX}
+                sourceY={pts.sourceY}
+                targetX={pts.targetX}
+                targetY={pts.targetY}
                 status={edge.status}
+                label={edge.label}
               />
             )
           })}
         </svg>
 
         {/* Nodes */}
-        {nodes.map((node) => (
-          <div
-            key={node.id}
-            data-node
-            data-node-id={node.id}
-            className={cn(
-              "absolute",
-              draggingNodeId === node.id ? "z-50" : "transition-shadow duration-200"
-            )}
-            style={{ 
-              left: node.x, 
-              top: node.y,
-              willChange: draggingNodeId === node.id ? "transform" : "auto"
-            }}
-          >
-            <AgentNode
-              {...node}
-              isSelected={selectedNodeId === node.id}
-              onClick={() => onNodeSelect(node.id)}
-              draggable={!!onNodesChange}
-            />
-          </div>
-        ))}
+        {nodes.map((node) => {
+          const dimmed = matchingNodeIds !== null && !matchingNodeIds.has(node.id)
+          return (
+            <div
+              key={node.id}
+              data-node
+              data-node-id={node.id}
+              className={cn(
+                "absolute",
+                draggingNodeId === node.id ? "z-50" : "transition-shadow duration-200",
+                dimmed && "opacity-20 pointer-events-none"
+              )}
+              style={{
+                left: node.x,
+                top: node.y,
+                willChange: draggingNodeId === node.id ? "transform" : "auto"
+              }}
+            >
+              <AgentNode
+                {...node}
+                isSelected={selectedNodeId === node.id}
+                onClick={() => onNodeSelect(node.id)}
+                draggable={!!onNodesChange}
+              />
+            </div>
+          )
+        })}
       </div>
+
+      {/* Search bar */}
+      {isSearchOpen && (
+        <div data-search className="absolute top-4 left-1/2 -translate-x-1/2 z-30">
+          <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-[rgba(36,36,36,0.95)] backdrop-blur-xl px-3 py-2 shadow-lg">
+            <Search className="h-4 w-4 text-white/40" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search agents..."
+              className="bg-transparent text-sm text-white outline-none placeholder:text-white/30 w-[200px]"
+            />
+            {searchQuery && (
+              <span className="text-xs text-white/40">
+                {matchingNodeIds?.size ?? 0} found
+              </span>
+            )}
+            <button
+              onClick={() => { setIsSearchOpen(false); setSearchQuery("") }}
+              className="p-0.5 rounded hover:bg-white/10"
+            >
+              <X className="h-3.5 w-3.5 text-white/40" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Minimap */}
+      {nodes.length > 2 && (
+        <div className="absolute bottom-4 right-4 rounded-xl border border-white/10 bg-[rgba(26,26,26,0.9)] backdrop-blur-xl p-2 shadow-lg">
+          <svg width={minimapSize.w} height={minimapSize.h} className="block">
+            {/* Edges */}
+            {edges.map((edge) => {
+              const s = nodes.find(n => n.id === edge.source)
+              const t = nodes.find(n => n.id === edge.target)
+              if (!s || !t) return null
+              return (
+                <line
+                  key={edge.id}
+                  x1={(s.x + NODE_WIDTH / 2 - graphBounds.minX) * minimapScale}
+                  y1={(s.y + NODE_HEIGHT / 2 - graphBounds.minY) * minimapScale}
+                  x2={(t.x + NODE_WIDTH / 2 - graphBounds.minX) * minimapScale}
+                  y2={(t.y + NODE_HEIGHT / 2 - graphBounds.minY) * minimapScale}
+                  stroke="rgba(255,255,255,0.15)"
+                  strokeWidth={1}
+                />
+              )
+            })}
+            {/* Nodes */}
+            {nodes.map((node) => {
+              const color = node.status === "active" ? "#10b981"
+                : node.status === "error" ? "#ef4444"
+                : node.status === "completed" ? "#3b82f6"
+                : "rgba(255,255,255,0.3)"
+              return (
+                <rect
+                  key={node.id}
+                  x={(node.x - graphBounds.minX) * minimapScale}
+                  y={(node.y - graphBounds.minY) * minimapScale}
+                  width={NODE_WIDTH * minimapScale}
+                  height={NODE_HEIGHT * minimapScale}
+                  rx={2}
+                  fill={color}
+                  opacity={0.7}
+                />
+              )
+            })}
+            {/* Viewport indicator */}
+            {canvasRef.current && (
+              <rect
+                x={(-offset.x / scale - graphBounds.minX) * minimapScale}
+                y={(-offset.y / scale - graphBounds.minY) * minimapScale}
+                width={(canvasRef.current.getBoundingClientRect().width / scale) * minimapScale}
+                height={(canvasRef.current.getBoundingClientRect().height / scale) * minimapScale}
+                fill="none"
+                stroke="rgba(255,255,255,0.4)"
+                strokeWidth={1}
+                rx={2}
+              />
+            )}
+          </svg>
+        </div>
+      )}
 
       {/* Layout controls - Bottom left */}
       <div className="absolute bottom-4 left-4 flex items-center gap-2">
@@ -277,6 +465,9 @@ export const GraphCanvas = memo(function GraphCanvas({
           </GlassButton>
           <GlassButton size="sm" onClick={fitToView} title="Fit to View">
             <Maximize2 className="h-4 w-4" />
+          </GlassButton>
+          <GlassButton size="sm" onClick={() => setIsSearchOpen(true)} title="Search (Ctrl+F)">
+            <Search className="h-4 w-4" />
           </GlassButton>
         </div>
         <div className="text-[13px] font-mono text-white/40 px-2">

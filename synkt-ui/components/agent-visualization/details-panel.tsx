@@ -1,15 +1,23 @@
 "use client"
 
 import { memo, useRef, useEffect, useState } from "react"
-import { X, Bot, Search, FileText, Zap, Clock, DollarSign, Hash, AlertCircle, CheckCircle2 } from "lucide-react"
+import { X, Bot, Search, FileText, Zap, Clock, DollarSign, Hash, AlertCircle, CheckCircle2, ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { type AgentNodeProps, type AgentStatus } from "./agent-node"
 import { GlassButton } from "./glass-button"
+
+export interface ActivityLogEntry {
+  time: string
+  event: string
+  type?: "info" | "error" | "success" | "handoff"
+}
 
 export interface DetailsPanelProps {
   agent: AgentNodeProps | null
   isOpen: boolean
   onClose: () => void
+  activityLog?: ActivityLogEntry[]
+  messages?: Array<{ from_agent: string; to_agent: string; content: string; timestamp: number }>
   className?: string
 }
 
@@ -27,16 +35,24 @@ const statusConfig: Record<AgentStatus, { icon: typeof CheckCircle2; color: stri
   completed: { icon: CheckCircle2, color: "text-accent-blue", label: "Completed" },
 }
 
+const logTypeColors = {
+  info: "text-white/40",
+  error: "text-accent-red",
+  success: "text-accent-green",
+  handoff: "text-accent-blue",
+}
+
 export const DetailsPanel = memo(function DetailsPanel({
   agent,
   isOpen,
   onClose,
+  activityLog,
+  messages,
   className,
 }: DetailsPanelProps) {
-  // Keep track of the last valid agent for smooth transitions
   const lastAgentRef = useRef(agent)
   const [displayAgent, setDisplayAgent] = useState(agent)
-  
+
   useEffect(() => {
     if (agent) {
       lastAgentRef.current = agent
@@ -44,12 +60,31 @@ export const DetailsPanel = memo(function DetailsPanel({
     }
   }, [agent])
 
-  // Use the last valid agent during close transition
   const activeAgent = displayAgent || lastAgentRef.current
   if (!activeAgent) return null
 
   const TypeIcon = typeIcons[activeAgent.type]
   const { icon: StatusIcon, color: statusColor, label: statusLabel } = statusConfig[activeAgent.status]
+
+  // Filter messages relevant to this agent
+  const agentMessages = messages?.filter(
+    (m) => m.from_agent === activeAgent.id || m.to_agent === activeAgent.id
+  ) ?? []
+
+  // Build activity log from real data or fall back to provided log or defaults
+  const displayLog: ActivityLogEntry[] = activityLog && activityLog.length > 0
+    ? activityLog
+    : agentMessages.length > 0
+      ? agentMessages.map((m) => ({
+          time: new Date(m.timestamp * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+          event: m.from_agent === activeAgent.id
+            ? `Handed off to ${m.to_agent}`
+            : `Received from ${m.from_agent}`,
+          type: (m.from_agent === activeAgent.id ? "handoff" : "info") as "handoff" | "info",
+        }))
+      : [
+          { time: "-", event: "No activity recorded", type: "info" as const },
+        ]
 
   return (
     <>
@@ -57,8 +92,8 @@ export const DetailsPanel = memo(function DetailsPanel({
       <div
         className={cn(
           "fixed inset-0 z-40 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
-          isOpen 
-            ? "bg-black/20 backdrop-blur-sm opacity-100 pointer-events-auto" 
+          isOpen
+            ? "bg-black/20 backdrop-blur-sm opacity-100 pointer-events-auto"
             : "bg-transparent backdrop-blur-none opacity-0 pointer-events-none"
         )}
         onClick={onClose}
@@ -131,36 +166,60 @@ export const DetailsPanel = memo(function DetailsPanel({
             </div>
           </div>
 
+          {/* Connections - show who this agent talks to */}
+          {agentMessages.length > 0 && (
+            <div>
+              <h3 className="text-[13px] font-medium text-white/60 mb-3">Connections</h3>
+              <div className="space-y-2">
+                {/* Deduplicate connections */}
+                {Array.from(
+                  new Set(
+                    agentMessages.map((m) =>
+                      m.from_agent === activeAgent.id ? m.to_agent : m.from_agent
+                    )
+                  )
+                ).map((peer) => {
+                  const outgoing = agentMessages.filter(
+                    (m) => m.from_agent === activeAgent.id && m.to_agent === peer
+                  ).length
+                  const incoming = agentMessages.filter(
+                    (m) => m.from_agent === peer && m.to_agent === activeAgent.id
+                  ).length
+                  return (
+                    <div
+                      key={peer}
+                      className="flex items-center justify-between rounded-lg border border-white/5 bg-white/[0.03] px-3 py-2"
+                    >
+                      <div className="flex items-center gap-2 text-[13px] text-white/70">
+                        <ArrowRight className="h-3.5 w-3.5 text-white/30" />
+                        <span className="font-mono">{peer}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-[11px] text-white/40">
+                        {outgoing > 0 && <span>{outgoing} sent</span>}
+                        {incoming > 0 && <span>{incoming} recv</span>}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Activity Log */}
           <div>
             <h3 className="text-[13px] font-medium text-white/60 mb-3">Activity Log</h3>
-            <div className="space-y-2">
-              {[
-                { time: "0.0s", event: "Agent initialized" },
-                { time: "0.2s", event: "Processing input..." },
-                { time: "1.1s", event: "Executing task" },
-                { time: "2.3s", event: activeAgent.status === "error" ? "Error encountered" : "Task completed" },
-              ].map((log, i) => (
+            <div className="space-y-1 max-h-[300px] overflow-y-auto">
+              {displayLog.map((log, i) => (
                 <div
                   key={i}
                   className="flex items-start gap-3 text-[13px] py-2 border-b border-white/5 last:border-0"
                 >
-                  <span className="font-mono text-white/40 w-12">{log.time}</span>
-                  <span className="text-white/70">{log.event}</span>
+                  <span className="font-mono text-white/40 w-20 shrink-0">{log.time}</span>
+                  <span className={cn("text-white/70", log.type && logTypeColors[log.type])}>
+                    {log.event}
+                  </span>
                 </div>
               ))}
-            </div>
-          </div>
-
-          {/* Output Preview */}
-          <div>
-            <h3 className="text-[13px] font-medium text-white/60 mb-3">Output Preview</h3>
-            <div className="rounded-xl border border-white/8 bg-[#121212]/50 p-4 font-mono text-[13px] text-white/70 leading-relaxed">
-              {activeAgent.status === "error" ? (
-                <span className="text-accent-red">Error: Connection timeout after 30000ms</span>
-              ) : (
-                <span>{"{ \"result\": \"success\", \"data\": [...] }"}</span>
-              )}
             </div>
           </div>
         </div>

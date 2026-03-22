@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 
 export interface AgentData {
   name: string
@@ -30,6 +30,9 @@ export function useTraceStream(url: string = "http://localhost:8000/stream") {
   const [traceData, setTraceData] = useState<TraceData | null>(null)
   const [connected, setConnected] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Accumulate snapshots for timeline replay
+  const [traceHistory, setTraceHistory] = useState<TraceData[]>([])
+  const historyRef = useRef<TraceData[]>([])
 
   const connect = useCallback(() => {
     let eventSource: EventSource | null = null
@@ -46,6 +49,9 @@ export function useTraceStream(url: string = "http://localhost:8000/stream") {
         try {
           const data = JSON.parse(event.data) as TraceData
           setTraceData(data)
+          // Append to history
+          historyRef.current = [...historyRef.current, data]
+          setTraceHistory(historyRef.current)
         } catch {
           // Ignore parse errors
         }
@@ -71,5 +77,10 @@ export function useTraceStream(url: string = "http://localhost:8000/stream") {
     return cleanup
   }, [connect])
 
-  return { traceData, connected, error }
+  const clearHistory = useCallback(() => {
+    historyRef.current = []
+    setTraceHistory([])
+  }, [])
+
+  return { traceData, connected, error, traceHistory, clearHistory }
 }
