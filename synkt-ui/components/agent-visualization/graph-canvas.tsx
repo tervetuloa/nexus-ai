@@ -1,6 +1,6 @@
 "use client"
 
-import { memo, useState, useCallback, useRef, useEffect } from "react"
+import { memo, useMemo, useState, useCallback, useRef, useEffect } from "react"
 import { cn } from "@/lib/utils"
 import { RotateCcw, Grid3X3, Maximize2, Search, X } from "lucide-react"
 import { AgentNode, type AgentNodeProps } from "./agent-node"
@@ -117,6 +117,25 @@ export const GraphCanvas = memo(function GraphCanvas({
           .map((n) => n.id)
       )
     : null
+
+  // Precompute parallel offsets for edges sharing the same node pair
+  const edgeOffsets = useMemo(() => {
+    const pairCounts = new Map<string, number>()
+    const pairIndices = new Map<string, number>()
+    const offsets = new Map<string, number>()
+    for (const edge of edges) {
+      const pairKey = [edge.source, edge.target].sort().join(":")
+      pairCounts.set(pairKey, (pairCounts.get(pairKey) ?? 0) + 1)
+    }
+    for (const edge of edges) {
+      const pairKey = [edge.source, edge.target].sort().join(":")
+      const count = pairCounts.get(pairKey)!
+      const idx = pairIndices.get(pairKey) ?? 0
+      pairIndices.set(pairKey, idx + 1)
+      offsets.set(edge.id, count > 1 ? (idx - (count - 1) / 2) * 16 : 0)
+    }
+    return offsets
+  }, [edges])
 
   // Get edge connection points using border intersection
   const getEdgePoints = useCallback(
@@ -352,6 +371,16 @@ export const GraphCanvas = memo(function GraphCanvas({
           className="absolute pointer-events-none overflow-visible"
           style={{ left: 0, top: 0, width: 1, height: 1, overflow: "visible" }}
         >
+          {/* Shared glow filter — one for all edges */}
+          <defs>
+            <filter id="edge-glow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+              <feMerge>
+                <feMergeNode in="coloredBlur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
           {edges.map((edge) => {
             const pts = getEdgePoints(edge.source, edge.target)
             return (
@@ -366,9 +395,11 @@ export const GraphCanvas = memo(function GraphCanvas({
                 sourceNy={pts.sourceNy}
                 targetNx={pts.targetNx}
                 targetNy={pts.targetNy}
+                parallelOffset={edgeOffsets.get(edge.id) ?? 0}
                 status={edge.status}
                 label={edge.label}
                 animateParticles={animateParticles}
+                glowFilterId="edge-glow"
               />
             )
           })}

@@ -17,9 +17,13 @@ export interface AnimatedEdgeProps {
   /** Outward normal direction at target border point */
   targetNx?: number
   targetNy?: number
+  /** Perpendicular offset for parallel edges between the same node pair */
+  parallelOffset?: number
   status?: EdgeStatus
   label?: string
   animateParticles?: boolean
+  /** ID of the shared glow filter in the parent SVG */
+  glowFilterId?: string
   className?: string
 }
 
@@ -56,9 +60,11 @@ export const AnimatedEdge = memo(function AnimatedEdge({
   sourceNy = 0,
   targetNx = 0,
   targetNy = 0,
+  parallelOffset = 0,
   status = "idle",
   label,
   animateParticles = true,
+  glowFilterId,
   className,
 }: AnimatedEdgeProps) {
   const uniqueId = useId()
@@ -69,44 +75,44 @@ export const AnimatedEdge = memo(function AnimatedEdge({
   const dy = targetY - sourceY
   const distance = Math.sqrt(dx * dx + dy * dy)
 
+  // Perpendicular unit vector for offsetting parallel edges
+  const perpX = distance > 0 ? -dy / distance : 0
+  const perpY = distance > 0 ? dx / distance : 0
+
+  // Apply parallel offset to source/target positions
+  const sx = sourceX + perpX * parallelOffset
+  const sy = sourceY + perpY * parallelOffset
+  const tx = targetX + perpX * parallelOffset
+  const ty = targetY + perpY * parallelOffset
+
   // Control point offset scales with distance — edges flow outward from each node's
-  // border along the normal before curving toward the other node. This ensures edges
-  // that exit the top/bottom at shallow angles still look cleanly attached.
+  // border along the normal before curving toward the other node.
   const cpOffset = Math.max(30, Math.min(80, distance * 0.35))
 
-  const controlX1 = sourceX + sourceNx * cpOffset
-  const controlY1 = sourceY + sourceNy * cpOffset
-  const controlX2 = targetX + targetNx * cpOffset
-  const controlY2 = targetY + targetNy * cpOffset
+  const controlX1 = sx + sourceNx * cpOffset + perpX * parallelOffset * 0.5
+  const controlY1 = sy + sourceNy * cpOffset + perpY * parallelOffset * 0.5
+  const controlX2 = tx + targetNx * cpOffset + perpX * parallelOffset * 0.5
+  const controlY2 = ty + targetNy * cpOffset + perpY * parallelOffset * 0.5
 
-  const pathD = `M ${sourceX} ${sourceY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${targetX} ${targetY}`
+  const pathD = `M ${sx} ${sy} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${tx} ${ty}`
 
   // Arrow direction: angle at target (from last control point into target)
-  const arrowAngle = Math.atan2(targetY - controlY2, targetX - controlX2)
+  const arrowAngle = Math.atan2(ty - controlY2, tx - controlX2)
   const arrowLen = 10
-  const ax1 = targetX - arrowLen * Math.cos(arrowAngle - Math.PI / 6)
-  const ay1 = targetY - arrowLen * Math.sin(arrowAngle - Math.PI / 6)
-  const ax2 = targetX - arrowLen * Math.cos(arrowAngle + Math.PI / 6)
-  const ay2 = targetY - arrowLen * Math.sin(arrowAngle + Math.PI / 6)
+  const ax1 = tx - arrowLen * Math.cos(arrowAngle - Math.PI / 6)
+  const ay1 = ty - arrowLen * Math.sin(arrowAngle - Math.PI / 6)
+  const ax2 = tx - arrowLen * Math.cos(arrowAngle + Math.PI / 6)
+  const ay2 = ty - arrowLen * Math.sin(arrowAngle + Math.PI / 6)
 
   // Label position: midpoint of the curve
   const midT = 0.5
-  const labelX = Math.pow(1-midT, 3) * sourceX + 3*Math.pow(1-midT, 2)*midT * controlX1 + 3*(1-midT)*midT*midT * controlX2 + midT*midT*midT * targetX
-  const labelY = Math.pow(1-midT, 3) * sourceY + 3*Math.pow(1-midT, 2)*midT * controlY1 + 3*(1-midT)*midT*midT * controlY2 + midT*midT*midT * targetY
+  const labelX = Math.pow(1-midT, 3) * sx + 3*Math.pow(1-midT, 2)*midT * controlX1 + 3*(1-midT)*midT*midT * controlX2 + midT*midT*midT * tx
+  const labelY = Math.pow(1-midT, 3) * sy + 3*Math.pow(1-midT, 2)*midT * controlY1 + 3*(1-midT)*midT*midT * controlY2 + midT*midT*midT * ty
+
+  const glowFilter = glowFilterId ? `url(#${glowFilterId})` : undefined
 
   return (
     <g className={className}>
-      {/* Glow filter for active/loop states */}
-      <defs>
-        <filter id={`glow-${uniqueId}`} x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="3" result="coloredBlur" />
-          <feMerge>
-            <feMergeNode in="coloredBlur" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-      </defs>
-
       {/* Main path */}
       <path
         id={pathId}
@@ -116,13 +122,13 @@ export const AnimatedEdge = memo(function AnimatedEdge({
         strokeWidth={2}
         strokeDasharray={strokeDasharray}
         strokeLinecap="round"
-        filter={(status === "active" || status === "loop") ? `url(#glow-${uniqueId})` : undefined}
+        filter={(status === "active" || status === "loop") ? glowFilter : undefined}
         className={cn(status === "loop" && "animate-pulse")}
       />
 
       {/* Arrow marker - rotated to match edge direction */}
       <polygon
-        points={`${ax1},${ay1} ${targetX},${targetY} ${ax2},${ay2}`}
+        points={`${ax1},${ay1} ${tx},${ty} ${ax2},${ay2}`}
         fill={stroke}
       />
 
@@ -160,7 +166,7 @@ export const AnimatedEdge = memo(function AnimatedEdge({
               key={i}
               r={4}
               fill={particleColor}
-              filter={`url(#glow-${uniqueId})`}
+              filter={glowFilter}
               className="opacity-0"
               style={{
                 offsetPath: `path("${pathD}")`,
