@@ -3,7 +3,12 @@ from __future__ import annotations
 import pytest
 from pydantic import BaseModel
 
-from synkt.assertions.coordination import assert_handoff, assert_parallel_execution
+from synkt.assertions.coordination import (
+    assert_agent_called,
+    assert_handoff,
+    assert_no_agent_called,
+    assert_parallel_execution,
+)
 from synkt.assertions.system import assert_cost_under, assert_no_loop
 from synkt.assertions.tools import assert_no_tool_called, assert_tool_called
 from synkt.trace.models import AgentTrace
@@ -111,6 +116,49 @@ def test_assert_cost_under_failure() -> None:
 
     with pytest.raises(AssertionError, match="exceeds threshold"):
         assert_cost_under(1.00)
+
+
+def test_assert_agent_called_success() -> None:
+    trace = AgentTrace()
+    trace.add_message("triage", "refunds", {"order_id": "12345"})
+    set_current_trace(trace)
+
+    assert_agent_called("refunds")
+
+
+def test_assert_agent_called_multiple_times() -> None:
+    trace = AgentTrace()
+    trace.add_message("router", "validator", {})
+    trace.add_message("router", "validator", {})
+    trace.add_message("router", "validator", {})
+    set_current_trace(trace)
+
+    assert_agent_called("validator", times=3)
+
+
+def test_assert_agent_called_wrong_count() -> None:
+    trace = AgentTrace()
+    set_current_trace(trace)
+
+    with pytest.raises(AssertionError, match="Expected 'summarizer' to be called 1 time"):
+        assert_agent_called("summarizer")
+
+
+def test_assert_no_agent_called_success() -> None:
+    trace = AgentTrace()
+    trace.add_message("triage", "refunds", {})
+    set_current_trace(trace)
+
+    assert_no_agent_called("human_review")
+
+
+def test_assert_no_agent_called_failure() -> None:
+    trace = AgentTrace()
+    trace.add_message("triage", "human_review", {"reason": "escalated"})
+    set_current_trace(trace)
+
+    with pytest.raises(AssertionError, match="Expected 'human_review' to never be called"):
+        assert_no_agent_called("human_review")
 
 
 def test_assert_parallel_execution_success() -> None:
