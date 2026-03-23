@@ -1,6 +1,6 @@
 "use client"
 
-import { memo, useId, useRef } from "react"
+import { memo, useId, useRef, useEffect, useCallback } from "react"
 import { cn } from "@/lib/utils"
 
 export type EdgeStatus = "idle" | "active" | "error" | "loop"
@@ -51,8 +51,10 @@ const statusStyles = {
   },
 }
 
-/** Pixels per second for particle travel */
+/** Pixels per second for particle travel — constant regardless of edge length */
 const PARTICLE_SPEED = 120
+/** Number of particles per edge */
+const PARTICLE_COUNT = 3
 
 export const AnimatedEdge = memo(function AnimatedEdge({
   id,
@@ -75,6 +77,10 @@ export const AnimatedEdge = memo(function AnimatedEdge({
   const pathId = `path-${id}-${uniqueId}`
   const { stroke, strokeDasharray, particleColor } = statusStyles[status]
 
+  const pathRef = useRef<SVGPathElement>(null)
+  const particleRefs = useRef<(SVGCircleElement | null)[]>([])
+  const rafRef = useRef<number>(0)
+
   // Source and target are already on the node border (computed upstream)
   const dx = targetX - sourceX
   const dy = targetY - sourceY
@@ -84,8 +90,8 @@ export const AnimatedEdge = memo(function AnimatedEdge({
   const perpX = distance > 0 ? -dy / distance : 0
   const perpY = distance > 0 ? dx / distance : 0
 
-  // Control point offset scales with distance
-  const cpOffset = Math.max(20, Math.min(80, distance * 0.35))
+  // Control point offset scales with distance — scale down for short edges
+  const cpOffset = Math.max(distance * 0.25, Math.min(80, distance * 0.35))
 
   // Control points: push outward along the border normal, and curve via parallelOffset
   const controlX1 = sourceX + sourceNx * cpOffset + perpX * parallelOffset * 0.5
@@ -95,7 +101,8 @@ export const AnimatedEdge = memo(function AnimatedEdge({
 
   // Arrow direction: angle from last control point into target
   const arrowAngle = Math.atan2(targetY - controlY2, targetX - controlX2)
-  const arrowLen = 10
+  // Scale arrow for short edges so it doesn't consume the entire path
+  const arrowLen = Math.min(10, distance * 0.3)
 
   // Shorten the visible path so it ends at the arrow base
   const endX = targetX - arrowLen * Math.cos(arrowAngle)
@@ -116,21 +123,61 @@ export const AnimatedEdge = memo(function AnimatedEdge({
 
   const glowFilter = glowFilterId ? `url(#${glowFilterId})` : undefined
 
-  // Approximate path length for constant-speed particles
-  const seg1 = Math.sqrt((controlX1 - sourceX) ** 2 + (controlY1 - sourceY) ** 2)
-  const seg2 = Math.sqrt((controlX2 - controlX1) ** 2 + (controlY2 - controlY1) ** 2)
-  const seg3 = Math.sqrt((endX - controlX2) ** 2 + (endY - controlY2) ** 2)
-  const chordLen = Math.sqrt((endX - sourceX) ** 2 + (endY - sourceY) ** 2)
-  const approxLen = (chordLen + seg1 + seg2 + seg3) / 2
-  const rawDuration = Math.max(0.8, approxLen / PARTICLE_SPEED)
-  // Quantize to 0.25s steps so dragging nodes doesn't cause erratic speed
-  // changes from continuous duration recalculation
-  const particleDuration = Math.round(rawDuration * 4) / 4
+  const showParticles = animateParticles && (status === "active" || status === "loop")
+
+  // rAF-based particle animation — uses a stable global clock so dragging
+  // nodes never causes restarts or speed jumps.
+  const setParticleRef = useCallback((el: SVGCircleElement | null, i: number) => {
+    particleRefs.current[i] = el
+  }, [])
+
+  useEffect(() => {
+    if (!showParticles) return
+
+    const animate = (timestamp: number) => {
+      const pathEl = pathRef.current
+      if (!pathEl) {
+        rafRef.current = requestAnimationFrame(animate)
+        return
+      }
+
+      const totalLength = pathEl.getTotalLength()
+      // Duration in ms for one full traversal at constant speed
+      const durationMs = (totalLength / PARTICLE_SPEED) * 1000
+      if (durationMs <= 0) {
+        rafRef.current = requestAnimationFrame(animate)
+        return
+      }
+
+      for (let i = 0; i < PARTICLE_COUNT; i++) {
+        const circle = particleRefs.current[i]
+        if (!circle) continue
+
+        const phaseOffset = i / PARTICLE_COUNT
+        // Global clock position — never resets
+        const t = ((timestamp / durationMs + phaseOffset) % 1)
+
+        const point = pathEl.getPointAtLength(t * totalLength)
+        circle.setAttribute("cx", String(point.x))
+        circle.setAttribute("cy", String(point.y))
+
+        // Fade in/out at the ends
+        const opacity = t < 0.1 ? t / 0.1 : t > 0.9 ? (1 - t) / 0.1 : 1
+        circle.setAttribute("opacity", String(opacity))
+      }
+
+      rafRef.current = requestAnimationFrame(animate)
+    }
+
+    rafRef.current = requestAnimationFrame(animate)
+    return () => cancelAnimationFrame(rafRef.current)
+  }, [showParticles])
 
   return (
     <g className={className}>
       {/* Main path — ends at arrow base */}
       <path
+        ref={pathRef}
         id={pathId}
         d={pathD}
         fill="none"
@@ -174,20 +221,17 @@ export const AnimatedEdge = memo(function AnimatedEdge({
         </g>
       )}
 
-      {/* Animated particles — travel along shortened path, stop at arrow base */}
-      {animateParticles && (status === "active" || status === "loop") && (
+      {/* Animated particles — positioned via rAF, not CSS animations */}
+      {showParticles && (
         <>
-          {[0, 0.33, 0.66].map((offset, i) => (
+          {Array.from({ length: PARTICLE_COUNT }, (_, i) => (
             <circle
               key={i}
+              ref={(el) => setParticleRef(el, i)}
               r={4}
               fill={particleColor}
               filter={glowFilter}
-              className="opacity-0"
-              style={{
-                offsetPath: `path("${pathD}")`,
-                animation: `particle-flow ${particleDuration}s ease-in-out ${offset * particleDuration}s infinite`,
-              }}
+              opacity={0}
             />
           ))}
         </>
