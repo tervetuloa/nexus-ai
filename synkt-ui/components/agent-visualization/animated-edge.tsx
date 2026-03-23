@@ -20,6 +20,8 @@ export interface AnimatedEdgeProps {
   /** Perpendicular offset for parallel edges — used only for control point
    *  curvature, NOT for shifting source/target (that's handled upstream). */
   parallelOffset?: number
+  /** Perpendicular offset to route around obstructing nodes */
+  avoidanceOffset?: number
   status?: EdgeStatus
   label?: string
   animateParticles?: boolean
@@ -67,6 +69,7 @@ export const AnimatedEdge = memo(function AnimatedEdge({
   targetNx = 0,
   targetNy = 0,
   parallelOffset = 0,
+  avoidanceOffset = 0,
   status = "idle",
   label,
   animateParticles = true,
@@ -93,11 +96,13 @@ export const AnimatedEdge = memo(function AnimatedEdge({
   // Control point offset scales with distance — scale down for short edges
   const cpOffset = Math.max(distance * 0.25, Math.min(80, distance * 0.35))
 
-  // Control points: push outward along the border normal, and curve via parallelOffset
-  const controlX1 = sourceX + sourceNx * cpOffset + perpX * parallelOffset * 0.5
-  const controlY1 = sourceY + sourceNy * cpOffset + perpY * parallelOffset * 0.5
-  const controlX2 = targetX + targetNx * cpOffset + perpX * parallelOffset * 0.5
-  const controlY2 = targetY + targetNy * cpOffset + perpY * parallelOffset * 0.5
+  // Control points: push outward along the border normal, curve via parallelOffset,
+  // and deflect perpendicular to avoid obstructing nodes
+  const curvePush = parallelOffset * 0.5 + avoidanceOffset
+  const controlX1 = sourceX + sourceNx * cpOffset + perpX * curvePush
+  const controlY1 = sourceY + sourceNy * cpOffset + perpY * curvePush
+  const controlX2 = targetX + targetNx * cpOffset + perpX * curvePush
+  const controlY2 = targetY + targetNy * cpOffset + perpY * curvePush
 
   // Arrow direction: angle from last control point into target
   const arrowAngle = Math.atan2(targetY - controlY2, targetX - controlX2)

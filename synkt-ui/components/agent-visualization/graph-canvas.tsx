@@ -142,6 +142,59 @@ export const GraphCanvas = memo(function GraphCanvas({
     return offsets
   }, [edges])
 
+  // Compute avoidance offsets — push edge curves away from intermediate nodes
+  // that would otherwise be intersected.
+  const edgeAvoidance = useMemo(() => {
+    const avoidances = new Map<string, number>()
+    for (const edge of edges) {
+      const srcNode = nodes.find((n) => n.id === edge.source)
+      const tgtNode = nodes.find((n) => n.id === edge.target)
+      if (!srcNode || !tgtNode) { avoidances.set(edge.id, 0); continue }
+
+      const sx = srcNode.x + NODE_WIDTH / 2
+      const sy = srcNode.y + NODE_HEIGHT / 2
+      const ex = tgtNode.x + NODE_WIDTH / 2
+      const ey = tgtNode.y + NODE_HEIGHT / 2
+      const eDx = ex - sx
+      const eDy = ey - sy
+      const eLen = Math.sqrt(eDx * eDx + eDy * eDy)
+      if (eLen < 1) { avoidances.set(edge.id, 0); continue }
+
+      // Unit vectors along and perpendicular to the edge
+      const ux = eDx / eLen
+      const uy = eDy / eLen
+
+      let totalPush = 0
+      for (const node of nodes) {
+        if (node.id === edge.source || node.id === edge.target) continue
+        const ncx = node.x + NODE_WIDTH / 2
+        const ncy = node.y + NODE_HEIGHT / 2
+        const rx = ncx - sx
+        const ry = ncy - sy
+        const along = rx * ux + ry * uy      // projection along edge
+        const perp = rx * (-uy) + ry * ux     // signed perpendicular distance
+
+        // Only consider nodes whose projection falls between source and target
+        if (along < 0 || along > eLen) continue
+
+        // Clearance: half the node diagonal + padding
+        const clearance = Math.sqrt(NODE_WIDTH * NODE_WIDTH + NODE_HEIGHT * NODE_HEIGHT) / 2 + 24
+        const absPerp = Math.abs(perp)
+        if (absPerp >= clearance) continue
+
+        // Strength: stronger push the closer the node is to the line
+        const strength = (clearance - absPerp) / clearance
+        // Push curve to the side opposite the obstructing node
+        const pushDir = perp >= 0 ? -1 : 1
+        // Weight by how centered the node is along the edge (strongest at midpoint)
+        const centeredness = 1 - Math.abs(along / eLen - 0.5) * 2
+        totalPush += pushDir * strength * centeredness * 100
+      }
+      avoidances.set(edge.id, totalPush)
+    }
+    return avoidances
+  }, [nodes, edges])
+
   // Get edge connection points using border intersection.
   // When parallelOffset != 0, we shift the aim point perpendicular to the
   // center-to-center line so the border exit/entry point moves along the
@@ -415,6 +468,7 @@ export const GraphCanvas = memo(function GraphCanvas({
                 targetNx={pts.targetNx}
                 targetNy={pts.targetNy}
                 parallelOffset={pOffset}
+                avoidanceOffset={edgeAvoidance.get(edge.id) ?? 0}
                 status={edge.status}
                 label={edge.label}
                 animateParticles={animateParticles}
