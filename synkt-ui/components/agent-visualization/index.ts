@@ -1,4 +1,4 @@
-export { AgentNode, type AgentNodeProps, type AgentStatus } from "./agent-node"
+export { AgentNode, type AgentNodeProps, type AgentStatus, type StructuralWarning } from "./agent-node"
 export { AnimatedEdge, type AnimatedEdgeProps, type EdgeStatus } from "./animated-edge"
 export { CostPanel, type CostPanelProps } from "./cost-panel"
 export { DetailsPanel, type DetailsPanelProps, type ActivityLogEntry } from "./details-panel"
@@ -7,3 +7,4 @@ export { GraphCanvas, type GraphCanvasProps, type GraphNode, type GraphEdge } fr
 export { Header, type HeaderProps } from "./header"
 export { SettingsPanel, type SettingsPanelProps, type Settings } from "./settings-panel"
 export { Timeline, type TimelineProps } from "./timeline"
+export { TopologyPanel, type TopologyPanelProps } from "./topology-panel"

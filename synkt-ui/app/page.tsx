@@ -7,13 +7,18 @@ import { CostPanel } from "@/components/agent-visualization/cost-panel"
 import { Timeline } from "@/components/agent-visualization/timeline"
 import { DetailsPanel } from "@/components/agent-visualization/details-panel"
 import { SettingsPanel, type Settings } from "@/components/agent-visualization/settings-panel"
-import { type AgentStatus } from "@/components/agent-visualization/agent-node"
+import { TopologyPanel } from "@/components/agent-visualization/topology-panel"
+import { type AgentStatus, type StructuralWarning } from "@/components/agent-visualization/agent-node"
 import { type EdgeStatus } from "@/components/agent-visualization/animated-edge"
-import { useTraceStream, type TraceData } from "@/hooks/use-trace-stream"
+import { useTraceStream, type TraceData, type TopologyData } from "@/hooks/use-trace-stream"
 
-// ─── Demo data (fallback when server is not running) ───
+// ─── Demo modes ───
 
-const initialNodes: GraphNode[] = [
+type DemoMode = "workflow" | "structural"
+
+// ─── Workflow demo data (fallback when server is not running) ───
+
+const workflowNodes: GraphNode[] = [
   { id: "orchestrator", name: "Orchestrator", type: "executor", status: "completed", cost: 0.012, x: 400, y: 50 },
   { id: "researcher", name: "Research Agent", type: "research", status: "active", cost: 0.042, x: 100, y: 200 },
   { id: "analyzer", name: "Data Analyzer", type: "analyzer", status: "active", cost: 0.028, x: 400, y: 200 },
@@ -22,7 +27,7 @@ const initialNodes: GraphNode[] = [
   { id: "publisher", name: "Publisher", type: "executor", status: "idle", cost: 0.000, x: 700, y: 380 },
 ]
 
-const initialEdges: GraphEdge[] = [
+const workflowEdges: GraphEdge[] = [
   { id: "e1", source: "orchestrator", target: "researcher", status: "active" },
   { id: "e2", source: "orchestrator", target: "analyzer", status: "active" },
   { id: "e3", source: "orchestrator", target: "writer", status: "idle" },
@@ -33,7 +38,7 @@ const initialEdges: GraphEdge[] = [
   { id: "e8", source: "reviewer", target: "writer", status: "idle" },
 ]
 
-const demoTimeline: { time: number; nodeUpdates: Record<string, AgentStatus>; edgeUpdates: Record<string, EdgeStatus> }[] = [
+const workflowTimeline: { time: number; nodeUpdates: Record<string, AgentStatus>; edgeUpdates: Record<string, EdgeStatus> }[] = [
   { time: 0, nodeUpdates: { orchestrator: "active" }, edgeUpdates: {} },
   { time: 0.5, nodeUpdates: { orchestrator: "completed", researcher: "active", analyzer: "active" }, edgeUpdates: { e1: "active", e2: "active" } },
   { time: 1.5, nodeUpdates: {}, edgeUpdates: { e4: "active" } },
@@ -44,6 +49,73 @@ const demoTimeline: { time: number; nodeUpdates: Record<string, AgentStatus>; ed
   { time: 5.0, nodeUpdates: { reviewer: "completed", writer: "active" }, edgeUpdates: { e8: "loop" } },
   { time: 5.5, nodeUpdates: { writer: "completed", publisher: "active" }, edgeUpdates: { e7: "active" } },
   { time: 6.0, nodeUpdates: { publisher: "completed" }, edgeUpdates: {} },
+]
+
+// ─── Structural testing demo data ───
+// Shows a broken graph with structural issues, then fixes them
+
+const structuralBrokenNodes: GraphNode[] = [
+  { id: "__start__", name: "__start__", type: "executor", status: "idle", cost: 0, x: 400, y: 30 },
+  { id: "triage", name: "Triage Agent", type: "analyzer", status: "idle", cost: 0, x: 150, y: 180, structuralWarnings: ["unbounded_cycle", "no_end_path"] },
+  { id: "refunds", name: "Refund Agent", type: "executor", status: "idle", cost: 0, x: 650, y: 180, structuralWarnings: ["unbounded_cycle", "no_end_path"] },
+  { id: "escalation", name: "Escalation Agent", type: "writer", status: "idle", cost: 0, x: 150, y: 380, structuralWarnings: ["unreachable"] },
+  { id: "analytics", name: "Analytics Agent", type: "research", status: "idle", cost: 0, x: 650, y: 380, structuralWarnings: ["dead_end", "no_end_path"] },
+  { id: "__end__", name: "__end__", type: "executor", status: "idle", cost: 0, x: 400, y: 530 },
+]
+
+const structuralBrokenEdges: GraphEdge[] = [
+  { id: "se1", source: "__start__", target: "triage", status: "active" },
+  { id: "se2", source: "triage", target: "refunds", status: "loop" },
+  { id: "se3", source: "refunds", target: "triage", status: "loop" },
+  { id: "se4", source: "triage", target: "analytics", status: "idle" },
+  // escalation is unreachable — no incoming edges
+  // analytics is a dead end — no outgoing edges
+  // triage <-> refunds is an unbounded cycle — no exit to __end__
+]
+
+const structuralFixedNodes: GraphNode[] = [
+  { id: "__start__", name: "__start__", type: "executor", status: "completed", cost: 0, x: 400, y: 30 },
+  { id: "triage", name: "Triage Agent", type: "analyzer", status: "completed", cost: 0.015, x: 150, y: 180 },
+  { id: "refunds", name: "Refund Agent", type: "executor", status: "completed", cost: 0.022, x: 650, y: 180 },
+  { id: "escalation", name: "Escalation Agent", type: "writer", status: "completed", cost: 0.008, x: 150, y: 380 },
+  { id: "analytics", name: "Analytics Agent", type: "research", status: "completed", cost: 0.012, x: 650, y: 380 },
+  { id: "__end__", name: "__end__", type: "executor", status: "completed", cost: 0, x: 400, y: 530 },
+]
+
+const structuralFixedEdges: GraphEdge[] = [
+  { id: "se1", source: "__start__", target: "triage", status: "active" },
+  { id: "se2", source: "triage", target: "refunds", status: "active" },
+  { id: "se3", source: "triage", target: "escalation", status: "active" },
+  { id: "se4", source: "refunds", target: "analytics", status: "active" },
+  { id: "se5", source: "escalation", target: "__end__", status: "active" },
+  { id: "se6", source: "analytics", target: "__end__", status: "active" },
+  { id: "se7", source: "refunds", target: "__end__", status: "active" },
+]
+
+const structuralBrokenTopology: TopologyData = {
+  dead_end_nodes: ["analytics"],
+  unreachable_nodes: ["escalation"],
+  unbounded_cycles: [["refunds", "triage"]],
+  missing_end_paths: ["analytics", "refunds", "triage"],
+  has_issues: true,
+  nodes: ["__start__", "triage", "refunds", "escalation", "analytics", "__end__"],
+  edges: [["__start__", "triage"], ["triage", "refunds"], ["refunds", "triage"], ["triage", "analytics"]],
+}
+
+const structuralFixedTopology: TopologyData = {
+  dead_end_nodes: [],
+  unreachable_nodes: [],
+  unbounded_cycles: [],
+  missing_end_paths: [],
+  has_issues: false,
+  nodes: ["__start__", "triage", "refunds", "escalation", "analytics", "__end__"],
+  edges: [["__start__", "triage"], ["triage", "refunds"], ["triage", "escalation"], ["refunds", "analytics"], ["escalation", "__end__"], ["analytics", "__end__"], ["refunds", "__end__"]],
+}
+
+const structuralTimeline: { time: number; phase: "broken" | "analyzing" | "fixed" }[] = [
+  { time: 0, phase: "broken" },
+  { time: 2.0, phase: "analyzing" },
+  { time: 4.0, phase: "fixed" },
 ]
 
 // ─── Helpers ───
@@ -61,18 +133,46 @@ function mapAgentStatus(s: string): AgentStatus {
   return "idle"
 }
 
-function traceToGraph(trace: TraceData, showEdgeLabels: boolean): { nodes: GraphNode[]; edges: GraphEdge[] } {
+function traceToGraph(trace: TraceData, topology: TopologyData | null, showEdgeLabels: boolean): { nodes: GraphNode[]; edges: GraphEdge[] } {
   const agents = trace.agents
   const cols = Math.max(Math.ceil(Math.sqrt(agents.length)), 2)
-  const nodes: GraphNode[] = agents.map((a, i) => ({
-    id: a.name,
-    name: a.name,
-    type: agentTypeMap[a.type] || "executor",
-    status: mapAgentStatus(a.status),
-    cost: a.cost,
-    x: 100 + (i % cols) * 340,
-    y: 80 + Math.floor(i / cols) * 200,
-  }))
+
+  // Build warning map from topology data (use Set per node to avoid duplicates)
+  const warningMap = new Map<string, Set<StructuralWarning>>()
+  if (topology?.has_issues) {
+    for (const node of topology.dead_end_nodes) {
+      if (!warningMap.has(node)) warningMap.set(node, new Set())
+      warningMap.get(node)!.add("dead_end")
+    }
+    for (const node of topology.unreachable_nodes) {
+      if (!warningMap.has(node)) warningMap.set(node, new Set())
+      warningMap.get(node)!.add("unreachable")
+    }
+    for (const cycle of topology.unbounded_cycles) {
+      for (const node of cycle) {
+        if (!warningMap.has(node)) warningMap.set(node, new Set())
+        warningMap.get(node)!.add("unbounded_cycle")
+      }
+    }
+    for (const node of topology.missing_end_paths) {
+      if (!warningMap.has(node)) warningMap.set(node, new Set())
+      warningMap.get(node)!.add("no_end_path")
+    }
+  }
+
+  const nodes: GraphNode[] = agents.map((a, i) => {
+    const ws = warningMap.get(a.name)
+    return {
+      id: a.name,
+      name: a.name,
+      type: agentTypeMap[a.type] || "executor",
+      status: mapAgentStatus(a.status),
+      cost: a.cost,
+      x: 100 + (i % cols) * 340,
+      y: 80 + Math.floor(i / cols) * 200,
+      structuralWarnings: ws ? Array.from(ws) : undefined,
+    }
+  })
 
   const edgeSet = new Set<string>()
   const edges: GraphEdge[] = []
@@ -164,11 +264,14 @@ export default function AgentVisualizationDashboard() {
   })
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
-  const { traceData, connected, error: streamError, traceHistory } = useTraceStream(settings.serverUrl)
+  const { traceData, topologyData, connected, error: streamError, traceHistory } = useTraceStream(settings.serverUrl)
   const isLive = connected && traceData !== null
 
   // Layout mode
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("freeform")
+
+  // Demo mode selector
+  const [demoMode, setDemoMode] = useState<DemoMode>("structural")
 
   // Toast notifications
   const [toasts, setToasts] = useState<Array<{ id: number; message: string; type: "error" | "warning" | "info" }>>([])
@@ -195,15 +298,28 @@ export default function AgentVisualizationDashboard() {
     lastLoopRef.current = traceData?.loop_detected ?? false
   }, [traceData?.loop_detected, traceData?.loop_agents, addToast])
 
+  // Topology issue toast
+  useEffect(() => {
+    if (topologyData?.has_issues) {
+      const issues: string[] = []
+      if (topologyData.unbounded_cycles.length > 0) issues.push(`${topologyData.unbounded_cycles.length} unbounded cycle(s)`)
+      if (topologyData.dead_end_nodes.length > 0) issues.push(`${topologyData.dead_end_nodes.length} dead-end node(s)`)
+      if (topologyData.unreachable_nodes.length > 0) issues.push(`${topologyData.unreachable_nodes.length} unreachable node(s)`)
+      addToast(`Structural issues: ${issues.join(", ")}`, "warning")
+    }
+  }, [topologyData, addToast])
+
   // Demo mode state
-  const [demoNodes, setDemoNodes] = useState<GraphNode[]>(initialNodes)
-  const [demoEdges, setDemoEdges] = useState<GraphEdge[]>(initialEdges)
+  const [demoNodes, setDemoNodes] = useState<GraphNode[]>(structuralBrokenNodes)
+  const [demoEdges, setDemoEdges] = useState<GraphEdge[]>(structuralBrokenEdges)
+  const [demoTopology, setDemoTopology] = useState<TopologyData | null>(structuralBrokenTopology)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [isPanelOpen, setIsPanelOpen] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
   const [speed, setSpeed] = useState(1)
-  const demoDuration = 6.0
+
+  const demoDuration = demoMode === "structural" ? 6.0 : 6.0
 
   // Live timeline replay
   const [isLiveReplay, setIsLiveReplay] = useState(false)
@@ -219,12 +335,15 @@ export default function AgentVisualizationDashboard() {
 
   const liveGraph = useMemo(() => {
     if (!activeTraceData) return null
-    return traceToGraph(activeTraceData, settings.showEdgeLabels)
-  }, [activeTraceData, settings.showEdgeLabels])
+    return traceToGraph(activeTraceData, topologyData, settings.showEdgeLabels)
+  }, [activeTraceData, topologyData, settings.showEdgeLabels])
 
   // Active nodes/edges: live or demo
   const nodes = isLive && liveGraph ? liveGraph.nodes : demoNodes
   const edges = isLive && liveGraph ? liveGraph.edges : demoEdges
+
+  // Active topology: live or demo
+  const activeTopology = isLive ? topologyData : demoTopology
 
   const selectedNode = selectedNodeId ? nodes.find((n) => n.id === selectedNodeId) || null : null
 
@@ -238,10 +357,35 @@ export default function AgentVisualizationDashboard() {
   // Timeline duration for live replay
   const liveDuration = traceHistory.length > 0 ? traceHistory.length - 1 : 0
 
-  // Demo timeline updates
+  // Structural demo timeline updates
   useEffect(() => {
-    if (isLive) return
-    const applicableUpdates = demoTimeline.filter((t) => t.time <= currentTime)
+    if (isLive || demoMode !== "structural") return
+
+    if (currentTime < 2.0) {
+      // Phase 1: Broken graph
+      setDemoNodes(structuralBrokenNodes)
+      setDemoEdges(structuralBrokenEdges)
+      setDemoTopology(structuralBrokenTopology)
+    } else if (currentTime < 4.0) {
+      // Phase 2: Analyzing (flash warnings)
+      setDemoNodes(structuralBrokenNodes.map(n => ({
+        ...n,
+        status: n.structuralWarnings?.length ? "error" as AgentStatus : n.status,
+      })))
+      setDemoEdges(structuralBrokenEdges)
+      setDemoTopology(structuralBrokenTopology)
+    } else {
+      // Phase 3: Fixed
+      setDemoNodes(structuralFixedNodes)
+      setDemoEdges(structuralFixedEdges)
+      setDemoTopology(structuralFixedTopology)
+    }
+  }, [currentTime, isLive, demoMode])
+
+  // Workflow demo timeline updates
+  useEffect(() => {
+    if (isLive || demoMode !== "workflow") return
+    const applicableUpdates = workflowTimeline.filter((t) => t.time <= currentTime)
 
     setDemoNodes((prev) => {
       const updated = [...prev]
@@ -251,7 +395,7 @@ export default function AgentVisualizationDashboard() {
           if (idx !== -1) {
             updated[idx] = { ...updated[idx], status }
             if (status === "active" || status === "completed") {
-              const baseCost = initialNodes.find((n) => n.id === nodeId)?.cost || 0
+              const baseCost = workflowNodes.find((n) => n.id === nodeId)?.cost || 0
               updated[idx].cost = baseCost > 0 ? baseCost : Math.random() * 0.05
             }
           }
@@ -272,7 +416,7 @@ export default function AgentVisualizationDashboard() {
       })
       return updated
     })
-  }, [currentTime, isLive])
+  }, [currentTime, isLive, demoMode])
 
   // Playback loop (demo mode)
   useEffect(() => {
@@ -290,7 +434,7 @@ export default function AgentVisualizationDashboard() {
     }, 100)
 
     return () => clearInterval(interval)
-  }, [isPlaying, speed, isLive])
+  }, [isPlaying, speed, isLive, demoDuration])
 
   useEffect(() => {
     panelMountedRef.current = true
@@ -298,6 +442,22 @@ export default function AgentVisualizationDashboard() {
       if (liveReplayIntervalRef.current) {
         clearInterval(liveReplayIntervalRef.current)
       }
+    }
+  }, [])
+
+  // Switch demo mode
+  const handleDemoModeSwitch = useCallback((mode: DemoMode) => {
+    setDemoMode(mode)
+    setCurrentTime(0)
+    setIsPlaying(false)
+    if (mode === "structural") {
+      setDemoNodes(structuralBrokenNodes)
+      setDemoEdges(structuralBrokenEdges)
+      setDemoTopology(structuralBrokenTopology)
+    } else {
+      setDemoNodes(workflowNodes)
+      setDemoEdges(workflowEdges)
+      setDemoTopology(null)
     }
   }, [])
 
@@ -349,7 +509,7 @@ export default function AgentVisualizationDashboard() {
       setCurrentTime(0)
     }
     setIsPlaying((prev) => !prev)
-  }, [currentTime, isLive, traceHistory, liveReplayIndex])
+  }, [currentTime, demoDuration, isLive, traceHistory, liveReplayIndex])
 
   const handleTimeChange = useCallback((time: number) => {
     if (isLive && traceHistory.length > 0) {
@@ -369,9 +529,16 @@ export default function AgentVisualizationDashboard() {
     setIsPlaying(false)
     setIsLiveReplay(false)
     setLiveReplayIndex(0)
-    setDemoNodes(initialNodes)
-    setDemoEdges(initialEdges)
-  }, [])
+    if (demoMode === "structural") {
+      setDemoNodes(structuralBrokenNodes)
+      setDemoEdges(structuralBrokenEdges)
+      setDemoTopology(structuralBrokenTopology)
+    } else {
+      setDemoNodes(workflowNodes)
+      setDemoEdges(workflowEdges)
+      setDemoTopology(null)
+    }
+  }, [demoMode])
 
   const handleNodesChange = useCallback((updatedNodes: GraphNode[]) => {
     if (!isLive) {
@@ -400,9 +567,10 @@ export default function AgentVisualizationDashboard() {
   const handleExport = useCallback(() => {
     const exportData = {
       timestamp: new Date().toISOString(),
-      nodes: nodes.map(({ id, name, type, status, cost }) => ({ id, name, type, status, cost })),
+      nodes: nodes.map(({ id, name, type, status, cost, structuralWarnings }) => ({ id, name, type, status, cost, structuralWarnings })),
       edges: edges.map(({ id, source, target, status, label }) => ({ id, source, target, status, label })),
       metrics: { totalCost, totalTokens, latency },
+      topology: activeTopology,
       traceData: activeTraceData ?? null,
     }
 
@@ -414,19 +582,72 @@ export default function AgentVisualizationDashboard() {
     a.click()
     URL.revokeObjectURL(url)
     addToast("Trace exported as JSON", "info")
-  }, [nodes, edges, totalCost, totalTokens, latency, activeTraceData, addToast])
+  }, [nodes, edges, totalCost, totalTokens, latency, activeTopology, activeTraceData, addToast])
+
+  const headerTitle = isLive
+    ? "Agent Workflow (Live)"
+    : demoMode === "structural"
+    ? "Structural Analysis (Demo)"
+    : "Agent Workflow (Demo)"
 
   return (
     <div className="flex h-screen flex-col bg-[#121212]">
       {/* Header */}
       <Header
-        title={isLive ? "Agent Workflow (Live)" : "Agent Workflow (Demo)"}
+        title={headerTitle}
         isConnected={connected}
         onRefresh={handleRefresh}
         onSettings={() => setIsSettingsOpen(true)}
         onLayoutToggle={handleLayoutToggle}
         onExport={handleExport}
       />
+
+      {/* Demo mode switcher — only visible in demo mode */}
+      {!isLive && (
+        <div className="flex items-center justify-center gap-1 border-b border-white/8 bg-[rgba(26,26,26,0.6)] px-4 py-2">
+          <button
+            onClick={() => handleDemoModeSwitch("structural")}
+            className={`rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all ${
+              demoMode === "structural"
+                ? "bg-accent-amber/20 text-accent-amber border border-accent-amber/30"
+                : "text-white/50 hover:text-white/80 hover:bg-white/5"
+            }`}
+          >
+            Structural Analysis
+          </button>
+          <button
+            onClick={() => handleDemoModeSwitch("workflow")}
+            className={`rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all ${
+              demoMode === "workflow"
+                ? "bg-accent-blue/20 text-accent-blue border border-accent-blue/30"
+                : "text-white/50 hover:text-white/80 hover:bg-white/5"
+            }`}
+          >
+            Workflow Trace
+          </button>
+        </div>
+      )}
+
+      {/* Structural issues banner */}
+      {activeTopology?.has_issues && (
+        <div className="bg-amber-900/80 border-b border-amber-700 px-4 py-2 text-center text-sm text-amber-200">
+          {demoMode === "structural" && currentTime < 4.0
+            ? "synkt caught structural issues BEFORE any LLM calls. Zero cost. Instant feedback."
+            : "Structural issues detected in graph topology"}
+          {activeTopology.unbounded_cycles.length > 0 && (
+            <span className="ml-2 font-semibold">
+              Unbounded cycles: {activeTopology.unbounded_cycles.map(c => c.join(" ↔ ")).join(", ")}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Fixed graph success banner */}
+      {demoMode === "structural" && currentTime >= 4.0 && !isLive && (
+        <div className="bg-green-900/80 border-b border-green-700 px-4 py-2 text-center text-sm text-green-200">
+          Graph fixed! All structural issues resolved. Safe to run.
+        </div>
+      )}
 
       {/* Loop detection banner */}
       {traceData?.loop_detected && (
@@ -456,6 +677,13 @@ export default function AgentVisualizationDashboard() {
             latency={latency}
           />
         </div>
+
+        {/* Floating topology panel */}
+        {activeTopology && (
+          <div className="absolute top-6 left-6">
+            <TopologyPanel topology={activeTopology} />
+          </div>
+        )}
 
         {/* Toast notifications */}
         <div className="absolute top-6 left-1/2 -translate-x-1/2 z-30 flex flex-col gap-2">
