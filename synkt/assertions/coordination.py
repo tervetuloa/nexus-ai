@@ -56,6 +56,77 @@ def assert_handoff(
             ) from exc
 
 
+def assert_agent_called(
+    agent_name: str,
+    times: int = 1,
+) -> None:
+    """
+    Assert that a specific agent was invoked (appeared as from_agent or to_agent) a given number
+    of times in the trace.
+
+    This is the agent-level counterpart to ``assert_tool_called``.  Use it to verify that
+    a particular agent participated in the execution the expected number of times — for example,
+    that a validator agent ran exactly once, or that a retry loop invoked an agent three times.
+
+    Args:
+        agent_name: Name of the agent to check (matched against ``from_agent`` and ``to_agent``
+                    fields of every recorded message).
+        times: Expected total number of messages in which the agent appears (default 1).
+
+    Raises:
+        AssertionError: If the actual invocation count does not equal *times*.
+
+    Examples:
+        >>> assert_agent_called("validator")
+        >>> assert_agent_called("researcher", times=3)
+    """
+    trace = get_current_trace()
+    invocations = [
+        msg
+        for msg in trace.messages
+        if msg.from_agent == agent_name or msg.to_agent == agent_name
+    ]
+
+    if len(invocations) != times:
+        raise AssertionError(
+            f"Expected '{agent_name}' to be called {times} time(s), "
+            f"but found {len(invocations)} invocation(s). "
+            f"All agents seen: {list({m.from_agent for m in trace.messages} | {m.to_agent for m in trace.messages})}"
+        )
+
+
+def assert_no_agent_called(agent_name: str) -> None:
+    """
+    Assert that a specific agent was never invoked during the trace.
+
+    This is the agent-level counterpart to ``assert_no_tool_called``.  Use it to verify that
+    an agent that should have been skipped (e.g. an escalation path, a human-review step,
+    or an expensive sub-agent) did not participate in the execution.
+
+    Args:
+        agent_name: Name of the agent that must not appear in any message.
+
+    Raises:
+        AssertionError: If the agent appears in one or more messages.
+
+    Examples:
+        >>> assert_no_agent_called("human_review")
+        >>> assert_no_agent_called("escalation_agent")
+    """
+    trace = get_current_trace()
+    invocations = [
+        msg
+        for msg in trace.messages
+        if msg.from_agent == agent_name or msg.to_agent == agent_name
+    ]
+
+    if invocations:
+        raise AssertionError(
+            f"Expected '{agent_name}' to never be called, "
+            f"but found {len(invocations)} invocation(s)."
+        )
+
+
 def assert_parallel_execution(agents: list[str], max_time_delta_ms: float = 50.0) -> None:
     """
     Assert that multiple agents executed in near-parallel based on timestamps.
