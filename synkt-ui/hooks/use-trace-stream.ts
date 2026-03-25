@@ -26,8 +26,19 @@ export interface TraceData {
   loop_agents: string[]
 }
 
+export interface TopologyData {
+  dead_end_nodes: string[]
+  unreachable_nodes: string[]
+  unbounded_cycles: string[][]
+  missing_end_paths: string[]
+  has_issues: boolean
+  nodes: string[]
+  edges: string[][]
+}
+
 export function useTraceStream(url: string = "http://localhost:8000/stream") {
   const [traceData, setTraceData] = useState<TraceData | null>(null)
+  const [topologyData, setTopologyData] = useState<TopologyData | null>(null)
   const [connected, setConnected] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Accumulate snapshots for timeline replay
@@ -60,6 +71,15 @@ export function useTraceStream(url: string = "http://localhost:8000/stream") {
         }
       })
 
+      eventSource.addEventListener("topology", (event) => {
+        try {
+          const data = JSON.parse(event.data) as TopologyData
+          setTopologyData(data)
+        } catch {
+          // Ignore parse errors
+        }
+      })
+
       eventSource.onerror = () => {
         setConnected(false)
         setError(
@@ -85,5 +105,5 @@ export function useTraceStream(url: string = "http://localhost:8000/stream") {
     setTraceHistory([])
   }, [])
 
-  return { traceData, connected, error, traceHistory, clearHistory }
+  return { traceData, topologyData, connected, error, traceHistory, clearHistory }
 }

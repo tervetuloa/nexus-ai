@@ -107,6 +107,20 @@ class TraceCollector:
         self.loop_agents = agents
         self._send_update()
 
+    def record_topology(self, report: dict) -> None:
+        """Send a structural analysis report to the server."""
+        try:
+            data = json.dumps({**report, "_event": "topology"}).encode("utf-8")
+            req = Request(
+                f"{self.server_url}/trace",
+                data=data,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            urlopen(req, timeout=2)
+        except (URLError, OSError):
+            pass
+
     def _send_update(self) -> None:
         """Send current state to server (synchronous, fire-and-forget)."""
         snapshot = TraceSnapshot(

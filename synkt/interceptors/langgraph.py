@@ -87,6 +87,23 @@ class LangGraphInterceptor(BaseInterceptor):
                 file=sys.stderr,
             )
 
+        # Stream topology report to live UI if enabled
+        if self._collector is not None:
+            topology_report = {
+                "dead_end_nodes": report["dead_end_nodes"],
+                "unreachable_nodes": report["unreachable_nodes"],
+                "unbounded_cycles": report["unbounded_cycles"],
+                "missing_end_paths": report["missing_end_paths"],
+                "has_issues": analyzer.has_structural_issues(),
+                "nodes": list(self.graph.nodes.keys()),
+                "edges": (
+                    [(e[0], e[1]) for e in self.graph.edges]
+                    if hasattr(self.graph, "edges")
+                    else []
+                ),
+            }
+            self._collector.record_topology(topology_report)
+
     def _wrap_tools(self) -> None:
         """Wrap tool callables so active mocks can short-circuit execution."""
         for _, node_obj in self.graph.nodes.items():

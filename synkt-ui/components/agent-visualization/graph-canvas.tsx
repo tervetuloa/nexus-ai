@@ -3,7 +3,7 @@
 import { memo, useMemo, useState, useCallback, useRef, useEffect } from "react"
 import { cn } from "@/lib/utils"
 import { RotateCcw, Grid3X3, Maximize2, Search, X } from "lucide-react"
-import { AgentNode, type AgentNodeProps } from "./agent-node"
+import { AgentNode, type AgentNodeProps, type StructuralWarning } from "./agent-node"
 import { AnimatedEdge, type EdgeStatus } from "./animated-edge"
 import { GlassButton } from "./glass-button"
 
@@ -13,6 +13,7 @@ const NODE_HEIGHT = 100 // Approximate rendered height
 export interface GraphNode extends AgentNodeProps {
   x: number
   y: number
+  structuralWarnings?: StructuralWarning[]
 }
 
 export interface GraphEdge {
@@ -448,6 +449,7 @@ export const GraphCanvas = memo(function GraphCanvas({
                 isSelected={selectedNodeId === node.id}
                 onClick={() => onNodeSelect(node.id)}
                 draggable={!!onNodesChange}
+                structuralWarnings={node.structuralWarnings}
               />
             </div>
           )
@@ -505,7 +507,9 @@ export const GraphCanvas = memo(function GraphCanvas({
             })}
             {/* Nodes */}
             {nodes.map((node) => {
-              const color = node.status === "active" ? "#10b981"
+              const hasWarning = node.structuralWarnings && node.structuralWarnings.length > 0
+              const color = hasWarning ? "#f59e0b"
+                : node.status === "active" ? "#10b981"
                 : node.status === "error" ? "#ef4444"
                 : node.status === "completed" ? "#3b82f6"
                 : "rgba(255,255,255,0.3)"
